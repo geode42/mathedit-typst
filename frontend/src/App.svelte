@@ -50,7 +50,7 @@
       wordWrap: 'on',
       theme: 'mathedit',
       fontFamily: 'JetBrains Mono',
-      fontWeight: '450',
+      fontWeight: '500',
       fontLigatures: true,
       // automaticLayout: true,
       wordWrapColumn: minWrappingColumns,

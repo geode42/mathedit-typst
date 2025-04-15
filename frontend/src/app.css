@@ -1,0 +1,31 @@
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/JetBrainsMono/JetBrainsMono[wght].ttf');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/JetBrainsMono/JetBrainsMono-Italic[wght].ttf');
+  font-style: italic;
+}
+
+:root {
+  font-family: 'JetBrains Mono';
+}
+
+button {
+  font-family: inherit;
+}
+
+body {
+  margin: 0;
+}
+
+#app {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  > * {
+    flex-grow: 1;
+  }
+}

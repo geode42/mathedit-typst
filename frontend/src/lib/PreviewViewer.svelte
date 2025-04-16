@@ -5,21 +5,21 @@
 	const scaleScrollPower = 0.5 // 0.5 feels like a nice middle ground between 0 and 1
 	
 	const autoScrollInitialVelocityTimeFrame = 100 // mouse positions longer than this ms ago will be discarded
-	const momentumScrollMinStepDuration = 3 // mouse position records will be merged until they're at least this ms long (to avoid rounding and div0 errors)
+	const momentumScrollMinStepDuration = 10 // mouse position entries will be merged until they're at least this ms long (to avoid duration rounding and div0 errors) (browsers only gives timestamps up to 1ms of accuracy)
 	const momentumScrollAcceleration = 0.9925 // when auto scrolling velocity is multiplied by this^delta each frame
-	const minSpeed = 0.01 // when speed is below this threshold auto scrolling will stop
-	const stepWeight = 0.22 // when calculating initial auto scroll velocity, each step is multiplied by this^duration and added to the existing velocity is multiplied by 1-that
+	const minSpeed = 0.005 // when speed is below this threshold auto scrolling will stop
+	const stepWeight = 0.03 // the lower this is, the more "momentum" you need to build up to go fast. If this is 1 the last step's speed will be used
 	const momentumScrollMousePositions: number[][] = [] // this should really be called steps
 
 	let containerElement: HTMLDivElement
 
 	function calculateInitialPanVelocity() {
-		if (!momentumScrollMousePositions.length) return [0, 0]
+		if (momentumScrollMousePositions.length < 2) return [0, 0] // you need at least two points to get velocity
 		const firstStep = momentumScrollMousePositions[0]
 		const lastStep = momentumScrollMousePositions.at(-1)!
 		let deltaSteps = []
 		if (lastStep[0] - firstStep[0] < momentumScrollMinStepDuration) {
-			deltaSteps.push({ duration: lastStep[0] - firstStep[0], delta: [lastStep[0] - firstStep[0], lastStep[1] - firstStep[1]] })
+			deltaSteps.push({ duration: lastStep[0] - firstStep[0], delta: [lastStep[1] - firstStep[1], lastStep[2] - firstStep[2]] })
 		} else {
 			const mergedMouseSteps = [{ startTime: firstStep[0], endTime: firstStep[0], startPos: [firstStep[1], firstStep[2]], endPos: [0, 0] }]
 			for (const step of momentumScrollMousePositions) {
@@ -42,14 +42,26 @@
 			}
 		}
 
+		// this block calculates the max speed, so that you'd have to build up momentum to go fast
 		const velocity = [0, 0]
 		for (const step of deltaSteps) {
-			const weight = Math.pow(stepWeight, step.duration)
-			velocity[0] = velocity[0] * (1 - weight) + step.delta[0] * weight
-			velocity[1] = velocity[1] * (1 - weight) + step.delta[1] * weight
+			// this for loop and the "/ step.duration" interpolate the steps into 1ms chunks so that
+			// your mouse's polling rate doesn't affect the physics
+			for (let i = 0; i < step.duration; i++) {
+				velocity[0] = velocity[0] * (1 - stepWeight) + step.delta[0] / step.duration * stepWeight
+				velocity[1] = velocity[1] * (1 - stepWeight) + step.delta[1] / step.duration * stepWeight
+			}
 		}
 
-		return velocity
+		// just final velocity for testing purposes
+		// return [deltaSteps.at(-1)!.delta[0] / deltaSteps.at(-1)!.duration, deltaSteps.at(-1)!.delta[1] / deltaSteps.at(-1)!.duration]
+
+		// this is all to say that angle = last-step-angle, speed = min(the-speed-above, last-step-speed)
+		const velMag = Math.hypot(...velocity)
+		const lastStepSpeed = Math.hypot(...deltaSteps.at(-1)!.delta)
+		const lastStepAngle = Math.atan2(deltaSteps.at(-1)!.delta[1], deltaSteps.at(-1)!.delta[0])
+		const finalVelMag = Math.min(lastStepSpeed, velMag)
+		return [finalVelMag * Math.cos(lastStepAngle), finalVelMag * Math.sin(lastStepAngle)]
 	}
 
 	function panRecursivelyWithMomentum(speed: number[], previousTimestamp: number, previousPreviousTimestamp: number) {

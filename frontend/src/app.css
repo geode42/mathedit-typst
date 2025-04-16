@@ -9,12 +9,48 @@
   font-style: italic;
 }
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 :root {
   font-family: 'JetBrains Mono';
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, input, textarea {
+  font-family: inherit;
+}
+
+
+input::-webkit-inner-spin-button {
+  appearance: none;
+}
+input[type=number] {
+  appearance: textfield;
 }
 
 button {
-  font-family: inherit;
+  background: white;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  padding: 0.15rem 0.4rem;
+  transition: border-color 0.25s;
+
+  &:hover {
+    cursor: pointer;
+    border-color: #33a230;
+  }
+}
+
+input {
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.5rem;
+  transition: border-color 0.25s;
+  &:focus {
+    border-color: #33a230;
+  }
 }
 
 body {

@@ -1,14 +1,14 @@
 <script lang='ts'>
-	let { svg = $bindable(''), scale = $bindable(1), translation = $bindable([0, 0]) } = $props()
+	let { children, scale = $bindable(1), translation = $bindable([0, 0]) } = $props()
 	const zoomSpeed = 1.001
 	const scrollSpeed = 0.25
 	const scaleScrollPower = 0.5 // 0.5 feels like a nice middle ground between 0 and 1
 	
 	const autoScrollInitialVelocityTimeFrame = 100 // mouse positions longer than this ms ago will be discarded
 	const momentumScrollMinStepDuration = 3 // mouse position records will be merged until they're at least this ms long (to avoid rounding and div0 errors)
-	const momentumScrollAcceleration = 0.993 // when auto scrolling velocity is multiplied by this^delta each frame
+	const momentumScrollAcceleration = 0.9925 // when auto scrolling velocity is multiplied by this^delta each frame
 	const minSpeed = 0.01 // when speed is below this threshold auto scrolling will stop
-	const stepWeight = 0.25 // when calculating initial auto scroll velocity, each step is multiplied by this^duration and added to the existing velocity is multiplied by 1-that
+	const stepWeight = 0.22 // when calculating initial auto scroll velocity, each step is multiplied by this^duration and added to the existing velocity is multiplied by 1-that
 	const momentumScrollMousePositions: number[][] = [] // this should really be called steps
 
 	let containerElement: HTMLDivElement
@@ -87,11 +87,13 @@
 		}
 	}}
 	onpointerdown={e => {
+		if (e.button != 0) return
 		dragging = true
 		containerElement.setPointerCapture(e.pointerId)
 		panPreviousPos = [e.clientX, e.clientY]
 	}}
 	onpointerup={e => {
+		// if (e.button != 0) return doesn't seem to do anything :(
 		dragging = false
 		containerElement.releasePointerCapture(e.pointerId)
 		while (momentumScrollMousePositions.length && (performance.now() - momentumScrollMousePositions[0][0]) > autoScrollInitialVelocityTimeFrame) {
@@ -112,15 +114,14 @@
 	}}
 >
 	<div class="transformed" style:transform={`translate(${translation[0]}px, ${translation[1]}px) scale(${scale})`}>
-		{@html svg}
+		{@render children?.()}
 	</div>
 </div>
 
 <style>
 	.container {
 		position: relative;
-		flex: 1 1 0;
-		overflow: hidden;
+		height: 100%;
 
 		&.dragging {
 			cursor: grabbing;
@@ -129,11 +130,5 @@
 	.transformed {
 		position: absolute;
 		transform-origin: top left;
-
-		:global(svg) {
-			/* should these be px? */
-			box-shadow: 0 0 0.7rem #00000015;
-			/* border-radius: 1rem; */
-		}
 	}
 </style>

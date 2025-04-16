@@ -6,11 +6,36 @@
   import './lib/monaco-typst-init'
   import { importBundledFonts } from './lib/typst-assets'
   import PreviewViewer from './lib/PreviewViewer.svelte'
+  import PreviewZoom from './lib/PreviewZoom.svelte'
 
   let source = $state('')
   let previewSvg = $state('')
+  let previewSvgElement = $derived(new DOMParser().parseFromString(previewSvg, 'text/html').body.childNodes[0])
   let previewScale = $state(1)
   let previewTranslation = $state([0, 0])
+  let previewContainer: HTMLDivElement
+  let svgWrapper: HTMLDivElement
+  
+  let renderedOnce = -1 // -1 initially, 0 for the first fake update the effect below gets, 1 when it rendered the typst once
+  let previewCenter = $state([0, 0])
+
+  function updatePreviewCenter() {
+    previewCenter = [previewContainer.offsetWidth / 2, previewContainer.offsetHeight / 2]
+  }
+
+  $effect(() => {
+    svgWrapper.replaceChildren(previewSvgElement)
+    setTimeout(() => {
+      if (renderedOnce != 1) {
+        renderedOnce++
+        if (renderedOnce == 1) {
+          zoomFit()
+          translateTop()
+          updatePreviewCenter()
+        }
+      }
+    })
+  })
 
   let webWorldLoaded = false
   const webWorld = wasm.WebWorld.new()
@@ -71,10 +96,20 @@
   // manually measured, ideally there'd be a better way of finding this
   // maybe editor.getLayoutInfo()?
   let minWrappingColumns = 15
+  const zoomFitPadding = 10 // px on each side
 
   $effect(() => {
     editor.updateOptions({ wordWrap: editorPaneWidth < minEditorSize ? 'wordWrapColumn' : 'on' })
   })
+
+  function zoomFit() {
+    previewScale = (previewContainer.offsetWidth - zoomFitPadding * 2) / svgWrapper.offsetWidth
+    previewTranslation[0] = zoomFitPadding
+  }
+  function translateTop() {
+    previewTranslation[1] = zoomFitPadding
+  }
+
 
 	const appSpinAnimation = new Animation(new KeyframeEffect(document.querySelector('#app'), { rotate: '360deg' }, { duration: 4000, easing: 'cubic-bezier(0.35, 0, 0.2, 1', composite: 'accumulate' }))
 </script>
@@ -85,8 +120,11 @@
       <button onclick={() => appSpinAnimation.play()}>spin</button>
     </div>
     <div class="toolbar-preview">
-      <button onclick={() => (previewScale = 1, previewTranslation = [0, 0])}>Reset view</button>
-      <span style="font-size: 0.85em; color: #888">ctrl+scroll to zoom</span>
+      <div class="toolbar-zoom-container">
+        <PreviewZoom bind:scale={previewScale} bind:translation={previewTranslation} zoomCenter={previewCenter} />
+        <button onclick={zoomFit}>Fit</button>
+      </div>
+      <span class='zoom-tip'>ctrl+scroll to zoom</span>
     </div>
   </div>
   <div class="panes">
@@ -107,6 +145,7 @@
           if (!draggingPaneDivider) return
           editorPaneWidth = e.clientX + draggingPaneDividerOffset
           editor.layout({ width: editorPaneWidth, height: editorContainer.offsetHeight })
+          updatePreviewCenter()
           // e.getCoalescedEvents().forEach(e => {}) doesn't seem to help here, which makes sense ig
         }}
         onpointerup={e => {
@@ -115,7 +154,11 @@
         }}
       ></div>
     </div>
-    <PreviewViewer bind:svg={previewSvg} bind:scale={previewScale} bind:translation={previewTranslation} />
+    <div bind:this={previewContainer} class="preview-container">
+      <PreviewViewer bind:scale={previewScale} bind:translation={previewTranslation}>
+        <div bind:this={svgWrapper} class="svg-wrapper"></div>
+      </PreviewViewer>
+    </div>
   </div>
 
 </main>
@@ -125,13 +168,27 @@
   .toolbar > * {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 2rem;
+    padding-left: 0.5rem;
+  }
+  .toolbar-zoom-container {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .zoom-tip {
+    font-size: 0.83rem;
+    color: #BBB;
+    pointer-events: none;
   }
   main {
     display: flex;
     flex-direction: column;
     height: 100svh;
     overflow: hidden;
+  }
+  .toolbar {
+    padding-block: 0.2rem;
   }
   .toolbar, .panes {
     display: flex;
@@ -153,5 +210,16 @@
     translate: calc(-1 * var(--padding));
     height: 100%;
     cursor: col-resize;
+    z-index: 999;
+  }
+
+  .preview-container {
+		flex: 1 1 0;
+		overflow: hidden;
+  }
+
+  .svg-wrapper :global(svg) {
+    box-shadow: 0 0 11px #00000015;
+    border-radius: 0.5rem;
   }
 </style>

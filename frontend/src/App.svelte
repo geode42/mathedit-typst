@@ -62,7 +62,6 @@
     renderPreview()
   })()
 
-
   function renderPreview() {
     if (!webWorldLoaded) return
     webWorld.source = source
@@ -163,9 +162,24 @@
   // maybe editor.getLayoutInfo()?
   let minWrappingColumns = 15
   const zoomFitPadding = 10 // px on each side
+  const handleMinDistance = 5 // px on each side, keep synced with `--padding` in CSS below
 
-  $effect(() => {
+  function updateLayoutStuff() {
+    // clamp divider
+    if (editorPaneWidth < handleMinDistance) editorPaneWidth = handleMinDistance
+    if (editorPaneWidth > innerWidth - handleMinDistance) editorPaneWidth = innerWidth - handleMinDistance
+
+    editor.layout({ width: editorPaneWidth, height: editorContainer.offsetHeight })
     editor.updateOptions({ wordWrap: editorPaneWidth < minEditorSize ? 'wordWrapColumn' : 'on' })
+    updatePreviewCenter()
+  }
+
+  addEventListener('resize', updateLayoutStuff)
+
+  // divider location effects
+  $effect(() => {
+    editorPaneWidth // is there a better way to tell svelte to react to stuff?
+    updateLayoutStuff()
   })
 
   function zoomFit() {
@@ -225,8 +239,6 @@
         onpointermove={e => {
           if (!draggingPaneDivider) return
           editorPaneWidth = e.clientX + draggingPaneDividerOffset
-          editor.layout({ width: editorPaneWidth, height: editorContainer.offsetHeight })
-          updatePreviewCenter()
           // e.getCoalescedEvents().forEach(e => {}) doesn't seem to help here, which makes sense ig
         }}
         onpointerup={e => {
@@ -292,11 +304,12 @@
     display: flex;
   }
   .panes {
-    flex-grow: 1;
+    flex: 1 1 0;
+    overflow: hidden;
   }
   .divider {
     --width: 1px;
-    --padding: 0.3em;
+    --padding: 5px; /* keep synced with `handleMinDistance` in JS above */
     width: var(--width);
     background: #EEE;
     position: relative;

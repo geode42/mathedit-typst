@@ -36,6 +36,7 @@ button {
   border-radius: 0.4rem;
   padding: 0.15rem 0.4rem;
   transition: border-color 0.25s;
+  font-size: 1em;
 
   &:hover {
     cursor: pointer;
@@ -48,6 +49,8 @@ input {
   border-radius: 0.4rem;
   padding: 0.2rem 0.5rem;
   transition: border-color 0.25s;
+  font-size: 1em;
+
   &:focus {
     border-color: #33a230;
   }
@@ -63,5 +66,16 @@ body {
   flex-direction: column;
   > * {
     flex-grow: 1;
+  }
+}
+
+a {
+  color: rgb(44, 136, 255);
+  text-decoration: inherit;
+  font-weight: 350;
+
+  &:hover {
+    color: rgb(24, 113, 229);
+    text-decoration: underline;
   }
 }

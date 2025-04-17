@@ -176,6 +176,14 @@
     previewTranslation[1] = zoomFitPadding
   }
 
+  const downloadData = (data: BlobPart[], type = 'text/plain', filename = '') => {
+    const url = URL.createObjectURL(new Blob(data, { type }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
 	const appSpinAnimation = new Animation(new KeyframeEffect(document.querySelector('#app'), { rotate: '360deg' }, { duration: 4000, easing: 'cubic-bezier(0.35, 0, 0.2, 1', composite: 'accumulate' }))
 </script>
@@ -184,12 +192,19 @@
   <div class="toolbar">
     <div class="toolbar-editor" style:width={`${editorPaneWidth}px`}>
       <button onclick={() => appSpinAnimation.play()}>spin</button>
+      <div class="spacer"></div>
+      <a href="https://github.com/geode42/mathedit-typst" target="_blank" rel="noopener noreferrer">GitHub repo</a>
+      <div class="spacer"></div>
+      <button onclick={() => downloadData([source], 'text/vnd.typst', 'markup.typ')}>Download Source</button>
+      <div class="spacer"></div>
+      <button onclick={() => downloadData([previewSvg], 'image/svg+xml', 'output.svg')}>Download SVG</button>
     </div>
     <div class="toolbar-preview">
       <div class="toolbar-zoom-container">
         <PreviewZoom bind:scale={previewScale} bind:translation={previewTranslation} zoomCenter={previewCenter} />
         <button onclick={zoomFit}>Fit</button>
       </div>
+      <div class="spacer"></div>
       <span class='zoom-tip'>ctrl+scroll to zoom</span>
     </div>
   </div>
@@ -234,8 +249,22 @@
   .toolbar > * {
     display: flex;
     align-items: center;
-    gap: 2rem;
-    padding-left: 0.5rem;
+    /* gap: 2rem; */
+    padding-inline: 0.5rem;
+    min-width: max-content;
+
+    * {
+      width: max-content;
+      flex-shrink: 0;
+    }
+
+    .spacer {
+      flex: 0 1 2rem;
+    }
+  }
+  .toolbar-preview {
+    flex-grow: 1;
+    /* justify-content: end; */
   }
   .toolbar-zoom-container {
     display: flex;
@@ -243,9 +272,8 @@
     gap: 0.3rem;
   }
   .zoom-tip {
-    font-size: 0.83rem;
     color: #BBB;
-    pointer-events: none;
+    user-select: none;
   }
   main {
     display: flex;
@@ -255,6 +283,10 @@
   }
   .toolbar {
     padding-block: 0.2rem;
+
+    * {
+      font-size: 0.83rem;
+    }
   }
   .toolbar, .panes {
     display: flex;
@@ -277,6 +309,10 @@
     height: 100%;
     cursor: col-resize;
     z-index: 999;
+  }
+
+  .editor-container {
+    padding-top: 0.2rem;
   }
 
   .preview-container {

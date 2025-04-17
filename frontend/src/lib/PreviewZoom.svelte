@@ -54,7 +54,7 @@
 	}
 
 	.input-wrapper-wrapper {
-		min-width: 4.25ch;
+		min-width: 41px; /* manually measured so it doesn't resize when having 1-3 digits */
 		display: grid;
 		place-items: center;
 	}

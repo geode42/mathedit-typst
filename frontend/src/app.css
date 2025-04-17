@@ -70,12 +70,12 @@ body {
 }
 
 a {
-  color: rgb(44, 136, 255);
+  color: #006AF3;
   text-decoration: inherit;
   font-weight: 350;
 
   &:hover {
-    color: rgb(24, 113, 229);
+    color: #005bd2;
     text-decoration: underline;
   }
 }

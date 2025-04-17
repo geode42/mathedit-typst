@@ -28,6 +28,10 @@ monaco.editor.defineTheme('mathedit', {
 		{
 			token: 'comment',
 			foreground: '#BABABA',
+		},
+		{
+			token: 'meta.link',
+			foreground: '#006AF3',
 		}
 	],
 	colors: {
@@ -77,6 +81,9 @@ monaco.languages.setMonarchTokensProvider('typst', {
 		root: [
 			[/"/,  { token: 'string.quote', bracket: '@open', next: '@string' } ],
 			[/\$/,  { token: 'math.delimiter', bracket: '@open', next: '@math' } ],
+			// typst seems to only like http and https https://github.com/typst/typst/blob/7e072e24930d8a7524f700b62cabd97ceb4f45e6/crates/typst-syntax/src/lexer.rs#L196
+			// and here's the rest of the characters it allows https://github.com/typst/typst/blob/7e072e24930d8a7524f700b62cabd97ceb4f45e6/crates/typst-syntax/src/lexer.rs#L979
+			[/(?:https?):\/\/[0-9a-zA-Z!#$%&*+,\-.\/:;=?@@_~'[\]()]*(?<![!,.:;?'])/, 'meta.link'], // monarch thinks the @ is a special syntax thing, but having two of them seems to fix it
 			{ include: '@whitespace' },
 			[/#[a-zA-Z_]?[a-zA-Z0-9_-]*[a-zA-Z](?=\()/, 'function'],
 			[/#[a-zA-Z_]?[a-zA-Z0-9_-]*[a-zA-Z]/, 'variable'],

@@ -10,7 +10,16 @@
   import { type JsSourceDiagnostic } from './lib/wasmUtils'
   import { registerAutocomplete } from './lib/monaco-typst-init'
 
-  let source = $state('')
+  const defaultSource = [
+    'Some math in Typst',
+    '',
+    '$(m v^2) / r = q v times B$',
+    ''
+  ].join('\n')
+
+  const beforeUnloadHandler = (e: BeforeUnloadEvent) => e.preventDefault()
+
+  let source = $state(defaultSource)
   let previewSvg = $state('')
   let previewSvgElement = $derived(new DOMParser().parseFromString(previewSvg ?? '<div></div>', 'text/html').body.childNodes[0])
   let previewScale = $state(1)
@@ -24,6 +33,12 @@
   function updatePreviewCenter() {
     previewCenter = [previewContainer.offsetWidth / 2, previewContainer.offsetHeight / 2]
   }
+
+  $effect(() => {
+    source != defaultSource
+      ? addEventListener('beforeunload', beforeUnloadHandler)
+      : removeEventListener('beforeunload', beforeUnloadHandler)
+  })
 
   $effect(() => {
     svgWrapper.replaceChildren(previewSvgElement)
@@ -116,7 +131,7 @@
 
   onMount(() => {
     editor = monaco.editor.create(editorContainer, {
-      value: 'Some math in Typst\n\n$(m v^2) / r = q v times B$\n',
+      value: defaultSource,
       language: 'typst',
       minimap: {
         enabled: false,

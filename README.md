@@ -10,5 +10,9 @@ If you wanted to do something similar I'd highly recommend [rustwasm.github.io/b
 
 Aside from that Vite + Svelte 5 is used to write the website, and know that it's very WIP rn, hopefully I'll work on it more in the future
 
+**in /frontend:**  
+`npm install` installs the things  
 `npm run dev` runs the website locally  
-`npm run build` builds the website; vite will complain about chunk sizes but that's just monaco being monaco
+`npm run build` builds the website; vite will complain about chunk sizes but that's just monaco being monaco  
+**in /wasm:**  
+`wasm-pack build --release` produces the wasm files  

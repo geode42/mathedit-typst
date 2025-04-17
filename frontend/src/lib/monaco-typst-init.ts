@@ -1,3 +1,4 @@
+import type { CompletionType, WebWorld } from 'mathedit-typst-wasm'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 
 monaco.editor.defineTheme('mathedit', {
@@ -45,6 +46,9 @@ monaco.languages.setLanguageConfiguration('typst', {
 	autoClosingPairs: [
 		{ open: '$', close: '$' }, // not in math would be nice, but the token provider below doesn't do that
 		{ open: '"', close: '"', notIn: ['string'] },
+		{ open: '*', close: '*', notIn: ['string'] }, // not in math would be nice for these too
+		{ open: '_', close: '_', notIn: ['string'] },
+		{ open: '`', close: '`', notIn: ['string'] },
 		{ open: '(', close: ')' },
 		{ open: '{', close: '}' },
 		{ open: '[', close: ']' },
@@ -56,7 +60,7 @@ monaco.languages.setLanguageConfiguration('typst', {
 			action: { indentAction: monaco.languages.IndentAction.IndentOutdent },
 		},
 	],
-	// autoCloseBefore: 'a', // how does this work?
+	autoCloseBefore: '$ ', // reference: https://code.visualstudio.com/api/language-extensions/language-configuration-guide#autoclosing-before
 })
 monaco.languages.setMonarchTokensProvider('typst', {
 	unicode: true,
@@ -111,3 +115,58 @@ monaco.languages.setMonarchTokensProvider('typst', {
 		],
 	},
 })
+
+export function getMonacoCompletionItemKind(type: CompletionType): monaco.languages.CompletionItemKind {
+	const map: Record<CompletionType, monaco.languages.CompletionItemKind> = {
+		'Syntax': monaco.languages.CompletionItemKind.Keyword, // i think?
+		'Func': monaco.languages.CompletionItemKind.Function,
+		'Type': monaco.languages.CompletionItemKind.TypeParameter, // TS uses Variable for its types though, so idk
+		'Param': monaco.languages.CompletionItemKind.Field,
+		'Constant': monaco.languages.CompletionItemKind.Constant,
+		'Path': monaco.languages.CompletionItemKind.File,
+		'Package': monaco.languages.CompletionItemKind.Module,
+		'Label': monaco.languages.CompletionItemKind.Reference,
+		'Font': monaco.languages.CompletionItemKind.File, // out of the options File feels the best, but idk
+		'Symbol': monaco.languages.CompletionItemKind.Value, // not sure
+	}
+	return map[type]
+}
+
+export function registerAutocomplete(webWorld: WebWorld) {
+	function convertSnippet(snippet: string): string {
+		// this code is very lazy
+		let counter = 0
+		while (true) {
+			counter++
+			let newSnippet = snippet.replace(/\${}/, `\${${counter}}`)
+			if (newSnippet != snippet) {
+				snippet = newSnippet
+				continue
+			}
+			newSnippet = snippet.replace(/\${(?=\D)/, `\${${counter}:`)
+			if (newSnippet != snippet) {
+				snippet = newSnippet
+				continue
+			}
+			break
+		}
+		return snippet
+	}
+	monaco.languages.registerCompletionItemProvider('typst', {
+		provideCompletionItems(model, position, context, token) {
+			const autocompleteResult = webWorld.autocomplete(model.getOffsetAt(position), context.triggerKind == monaco.languages.CompletionTriggerKind.Invoke)
+			if (!autocompleteResult) return { suggestions: [] }
+			const completions = autocompleteResult.completions
+			return {
+				suggestions: completions.map(c => ({
+					label: c.label,
+					kind: getMonacoCompletionItemKind(c.kind.type),
+					detail: c.detail,
+					insertText: convertSnippet(c.apply || c.label),
+					insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+					range: undefined!, // was this supposed to be optional in monaco?
+				}))
+			}
+		},
+	})
+}

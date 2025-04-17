@@ -7,10 +7,12 @@
   import { importBundledFonts } from './lib/typst-assets'
   import PreviewViewer from './lib/PreviewViewer.svelte'
   import PreviewZoom from './lib/PreviewZoom.svelte'
+  import { type JsSourceDiagnostic } from './lib/wasmUtils'
+  import { registerAutocomplete } from './lib/monaco-typst-init'
 
   let source = $state('')
   let previewSvg = $state('')
-  let previewSvgElement = $derived(new DOMParser().parseFromString(previewSvg, 'text/html').body.childNodes[0])
+  let previewSvgElement = $derived(new DOMParser().parseFromString(previewSvg ?? '<div></div>', 'text/html').body.childNodes[0])
   let previewScale = $state(1)
   let previewTranslation = $state([0, 0])
   let previewContainer: HTMLDivElement
@@ -50,8 +52,57 @@
     if (!webWorldLoaded) return
     webWorld.source = source
     webWorld.compile()
-    previewSvg = webWorld.renderSvg()!
-    console.log('hi?', webWorld.errors(), webWorld.warnings())
+    const svg = webWorld.renderSvg()
+
+    if (svg) previewSvg = svg
+
+    const warnings: JsSourceDiagnostic[] = webWorld.warnings()
+    const errors: JsSourceDiagnostic[] = webWorld.errors()
+
+    // in IMarkerData, `code` and `source` get added in light gray right after the message
+    // src: https://code.visualstudio.com/api/references/vscode-api#Diagnostic
+
+    const getMarkerSpan = (diagnostic: JsSourceDiagnostic) => {
+      const start = editor.getModel()!.getPositionAt(diagnostic.span.start)
+      const end = editor.getModel()!.getPositionAt(diagnostic.span.end)
+      return {
+        startLineNumber: start.lineNumber,
+        startColumn: start.column,
+        endLineNumber: end.lineNumber,
+        endColumn: end.column,
+      }
+    }
+
+    const warningMarkers = warnings.flatMap(i => {
+      return [
+        {
+          severity: monaco.MarkerSeverity.Warning,
+          message: i.message,
+          ...getMarkerSpan(i),
+        },
+        ...i.hints.map(h => ({
+          severity: monaco.MarkerSeverity.Hint,
+          message: h,
+          ...getMarkerSpan(i),
+        }))
+      ]
+    })
+    const errorMarkers = errors.flatMap(i => {
+      return [
+        {
+          severity: monaco.MarkerSeverity.Error,
+          message: i.message,
+          ...getMarkerSpan(i),
+        },
+        ...i.hints.map(h => ({
+          severity: monaco.MarkerSeverity.Hint,
+          message: h,
+          ...getMarkerSpan(i),
+        }))
+      ]
+    })
+
+    monaco.editor.setModelMarkers(editor.getModel()!, 'typst', [...warningMarkers, ...errorMarkers])
   }
   
   let editorContainer: HTMLDivElement
@@ -77,15 +128,15 @@
       fontFamily: 'JetBrains Mono',
       fontWeight: '500',
       fontLigatures: true,
-      // automaticLayout: true,
       wordWrapColumn: minWrappingColumns,
     })
     source = editor.getValue()
 
     editor.onDidChangeModelContent(e => {
-      // console.log(e)
       source = editor.getValue()
     })
+
+    registerAutocomplete(webWorld)
   })
 
   let editorPaneWidth = $state(innerWidth / 2)

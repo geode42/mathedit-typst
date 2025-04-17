@@ -87,8 +87,7 @@ monaco.languages.setLanguageConfiguration('typst', {
 })
 
 export function addMathDelimiterIndentationListener(editor: monaco.editor.IStandaloneCodeEditor, indent = '    ') {
-	// todo: i assume onKeyDown can only be used once? so figure that out somehow
-	// todo: also see if an undo/redo step could be added
+	// todo: see if an undo/redo step could be added
 	editor.onKeyDown(e => {
 		if (e.keyCode != monaco.KeyCode.Enter) return
 		const startPosition = editor.getPosition()!

@@ -9,6 +9,7 @@
   import PreviewZoom from './lib/PreviewZoom.svelte'
   import { type JsSourceDiagnostic } from './lib/wasmUtils'
   import { addMathDelimiterIndentationListener, registerAutocomplete } from './lib/monaco-typst-init'
+  import geode42Logo from './assets/geode42.svg'
 
   const defaultSource = [
     'Some math in Typst',
@@ -26,6 +27,7 @@
   let previewTranslation = $state([0, 0])
   let previewContainer: HTMLDivElement
   let svgWrapper: HTMLDivElement
+  let logoVisible = $state(true)
   
   let renderedOnce = -1 // -1 initially, 0 for the first fake update the effect below gets, 1 when it rendered the typst once
   let previewCenter = $state([0, 0])
@@ -154,6 +156,10 @@
 
     registerAutocomplete(webWorld)
     addMathDelimiterIndentationListener(editor, '    ')
+
+    editor.onDidContentSizeChange(e => {
+      logoVisible = innerHeight - (editorContainer.offsetTop + e.contentHeight) >= minEmptySpaceBelowEditorForLogo
+    })
   })
 
   let editorPaneWidth = $state(innerWidth / 2)
@@ -166,6 +172,7 @@
   let minWrappingColumns = 15
   const zoomFitPadding = 10 // px on each side
   const handleMinDistance = 5 // px on each side, keep synced with `--padding` in CSS below
+  const minEmptySpaceBelowEditorForLogo = 70
 
   function updateLayoutStuff() {
     // clamp divider
@@ -223,6 +230,8 @@
       </div>
       <div class="spacer"></div>
       <span class='zoom-tip'>ctrl+scroll to zoom</span>
+      <div class="line-spacer"></div>
+      <a class='math-reference-link' href="https://typst.app/docs/reference/math/" target="_blank" rel="noopener noreferrer">Math reference</a>
     </div>
   </div>
   <div class="panes">
@@ -256,7 +265,7 @@
       </PreviewViewer>
     </div>
   </div>
-
+  <img class='geode42-logo' class:visible={logoVisible} src={geode42Logo} alt='geode42 logo' />
 </main>
 
 
@@ -276,6 +285,9 @@
     .spacer {
       flex: 0 1 2rem;
     }
+    .line-spacer {
+      flex: 1 1 3rem;
+    }
   }
   .toolbar-preview {
     flex-grow: 1;
@@ -289,6 +301,22 @@
   .zoom-tip {
     color: #BBB;
     user-select: none;
+  }
+  .math-reference-link {
+    margin-left: 0.8rem;
+  }
+  .geode42-logo {
+    height: 2.1rem;
+    position: absolute;
+    bottom: 1.3rem;
+    left: 1.3rem;
+    opacity: 0;
+    transition: opacity 0.5s;
+    pointer-events: none;
+
+    &.visible {
+      opacity: 0.5;
+    }
   }
   main {
     display: flex;

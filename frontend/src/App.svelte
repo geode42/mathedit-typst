@@ -8,7 +8,7 @@
   import PreviewViewer from './lib/PreviewViewer.svelte'
   import PreviewZoom from './lib/PreviewZoom.svelte'
   import { type JsSourceDiagnostic } from './lib/wasmUtils'
-  import { registerAutocomplete } from './lib/monaco-typst-init'
+  import { addMathDelimiterIndentationListener, registerAutocomplete } from './lib/monaco-typst-init'
 
   const defaultSource = [
     'Some math in Typst',
@@ -143,6 +143,8 @@
       fontWeight: '500',
       fontLigatures: true,
       wordWrapColumn: minWrappingColumns,
+      stickyTabStops: true,
+      // keep tabs/spaces synced with `addMathDelimiterIndentationListener` right below !
     })
     source = editor.getValue()
 
@@ -151,6 +153,7 @@
     })
 
     registerAutocomplete(webWorld)
+    addMathDelimiterIndentationListener(editor, '    ')
   })
 
   let editorPaneWidth = $state(innerWidth / 2)

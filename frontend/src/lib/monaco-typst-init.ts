@@ -22,6 +22,10 @@ monaco.editor.defineTheme('mathedit', {
 			foreground: '#096a99',
 		},
 		{
+			token: 'newline',
+			foreground: '#096a99',
+		},
+		{
 			token: 'math.delimiter',
 			foreground: '#33a230',
 		},
@@ -30,7 +34,7 @@ monaco.editor.defineTheme('mathedit', {
 			foreground: '#BABABA',
 		},
 		{
-			token: 'meta.link',
+			token: 'link',
 			foreground: '#006AF3',
 		}
 	],
@@ -58,24 +62,84 @@ monaco.languages.setLanguageConfiguration('typst', {
 		{ open: '[', close: ']' },
 	],
 	onEnterRules: [
+		// match $|$
 		{
-			beforeText: /\$/,
-			afterText: /\$/,
+			beforeText: /\$$/,
+			afterText: /^\$/, // '^' to start the match at the cursor (as opposed to looking for a '$' anywhere in the line)
 			action: { indentAction: monaco.languages.IndentAction.IndentOutdent },
+		},
+		// match $|some_text$
+		// handled by addMathDelimiterIndentationListener below
+		// {
+		// 	beforeText: /\$$/,
+		// 	afterText: /\$/,
+		// 	action: { indentAction: monaco.languages.IndentAction.Indent },
+		// },
+
+		// match |$
+		{
+			beforeText: /./,
+			afterText: /^\$/,
+			action: { indentAction: monaco.languages.IndentAction.Outdent },
 		},
 	],
 	autoCloseBefore: '$ ', // reference: https://code.visualstudio.com/api/language-extensions/language-configuration-guide#autoclosing-before
 })
+
+export function addMathDelimiterIndentationListener(editor: monaco.editor.IStandaloneCodeEditor, indent = '    ') {
+	// todo: i assume onKeyDown can only be used once? so figure that out somehow
+	// todo: also see if an undo/redo step could be added
+	editor.onKeyDown(e => {
+		if (e.keyCode != monaco.KeyCode.Enter) return
+		const startPosition = editor.getPosition()!
+		const line = editor.getModel()!.getLineContent(startPosition.lineNumber)
+		const previousCharacter = line[startPosition.column - 2]
+		const nextCharacter = line[startPosition.column - 1]
+		const textAfterCursor = line.slice(startPosition.column - 1)
+		if (previousCharacter == '$' && textAfterCursor.includes('$') && nextCharacter != '$') { // if the next character is also a '$', then there's no text in between and the normal indent rules can be used
+			const endPosition = startPosition.with(undefined, startPosition.column + textAfterCursor.indexOf('$'))
+			const currentIndent = (line.length - line.replaceAll(indent, '').length) / indent.length
+			setTimeout(() => {
+				const startColumn = editor.getPosition()!.column
+				const line = editor.getModel()!.getLineContent(startPosition.lineNumber + 1)
+				editor.executeEdits('mathedit-typst', [
+					{
+						range: {
+							startLineNumber: startPosition.lineNumber + 1,
+							startColumn: startColumn,
+							endLineNumber: endPosition.lineNumber + 1,
+							endColumn: startColumn,
+						},
+						text: indent,
+					},
+					{
+						range: {
+							startLineNumber: startPosition.lineNumber + 1,
+							startColumn: line.indexOf('$') + 1,
+							endLineNumber: endPosition.lineNumber + 1,
+							endColumn: line.indexOf('$') + 1,
+						},
+						text: `\n${indent.repeat(currentIndent)}`,
+					},
+				])
+				// move cursor
+				// editor.setPosition({ lineNumber: startPosition.lineNumber + 1, column: Number.MAX_VALUE })
+			})
+		}
+	})
+}
+
 monaco.languages.setMonarchTokensProvider('typst', {
 	unicode: true,
 	
-	defaultToken: 'invalid',
+	// useful for writing syntax
+	// defaultToken: 'invalid',
 	
 	// source: https://typst.app/docs/reference/foundations/str/#definitions-to-unicode
 	stringEscapes: /\\(?:[\\"nrt]|u\{[0-9A-Fa-f]{1,5}\})/,
 	mathEscapes: /\\(?:u\{[0-9A-Fa-f]{1,5}\}|.)/, // there are a bunch of math escapes (like $#^_&"\\, and stuff like "\!="), so i'm just matching everything
-	symbols: /[+\-*\/^_=!><|]+/,
-	mathOperators: ['+', '-', '*', '/', '^', '_', '=', '!=', '>', '<', '>=', '<=', '|'],
+	symbols: /[+\-*\/^_=!><|&]+/,
+	mathOperators: ['+', '-', '*', '/', '^', '_', '=', '!=', '>', '<', '>=', '<=', '|', '&', '&='],
 	
 	tokenizer: {
 		root: [
@@ -83,10 +147,11 @@ monaco.languages.setMonarchTokensProvider('typst', {
 			[/\$/,  { token: 'math.delimiter', bracket: '@open', next: '@math' } ],
 			// typst seems to only like http and https https://github.com/typst/typst/blob/7e072e24930d8a7524f700b62cabd97ceb4f45e6/crates/typst-syntax/src/lexer.rs#L196
 			// and here's the rest of the characters it allows https://github.com/typst/typst/blob/7e072e24930d8a7524f700b62cabd97ceb4f45e6/crates/typst-syntax/src/lexer.rs#L979
-			[/(?:https?):\/\/[0-9a-zA-Z!#$%&*+,\-.\/:;=?@@_~'[\]()]*(?<![!,.:;?'])/, 'meta.link'], // monarch thinks the @ is a special syntax thing, but having two of them seems to fix it
+			[/(?:https?):\/\/[0-9a-zA-Z!#$%&*+,\-.\/:;=?@@_~'[\]()]*(?<![!,.:;?'])/, 'link'], // monarch thinks the @ is a special syntax thing, but having two of them seems to fix it
 			{ include: '@whitespace' },
-			[/#[a-zA-Z_]?[a-zA-Z0-9_-]*[a-zA-Z](?=\()/, 'function'],
-			[/#[a-zA-Z_]?[a-zA-Z0-9_-]*[a-zA-Z]/, 'variable'],
+			{ include: '@newline'},
+			[/#[a-zA-Z_][a-zA-Z0-9_-]*[a-zA-Z](?=\()/, 'function'],
+			[/#[a-zA-Z_][a-zA-Z0-9_-]*[a-zA-Z]/, 'variable'],
 			[/^\s*(-|\+)(.*)$/, ['list-marker', 'text']],
 			[/./, "text"],
 		],
@@ -100,11 +165,12 @@ monaco.languages.setMonarchTokensProvider('typst', {
 			// [/[^\\\$"+\-*\/^_=!><|]+/, 'math'], // symbols regex copied here, is there a better way of doing this?
 			[/@mathEscapes/, 'math.escape'],
 			{ include: '@whitespace' },
+			{ include: '@newline'},
 			// no invalid escape, see above
 			[/@symbols/, { cases: { '@mathOperators': 'math.operator', '@default': '' } }],
 			// todo: this isn't accurate, see if \p{L} works with the unicode param (also see https://forum.typst.app/t/what-are-the-rules-for-identifiers-in-typst/665)
-			[/[a-zA-Z_][a-zA-Z0-9_-]*[a-zA-Z](?=\()/, 'function'],
-			[/[a-zA-Z_][a-zA-Z0-9_-]*[a-zA-Z]/, 'variable'],
+			[/#?[a-zA-Z_][a-zA-Z0-9_-]*[a-zA-Z](?=\()/, 'function'],
+			[/#?[a-zA-Z_][a-zA-Z0-9_-]*[a-zA-Z]/, 'variable'],
 			[/[a-zA-Z0-9]/, 'character'],
 			[/"/,  { token: 'string.quote', bracket: '@open', next: '@string' } ],
 			[/\$/, { token: 'math.delimiter', bracket: '@close', next: '@pop' }],
@@ -119,6 +185,9 @@ monaco.languages.setMonarchTokensProvider('typst', {
 			[/[ \t\r\n]+/, 'whitespace'], // should this be all whitespace?
 			[/\/\*/,       'comment', '@comment' ],
 			[/\/\/.*$/,    'comment'],
+		],
+		newline: [
+			[/\\(?:\s|$)/, 'newline'],
 		],
 	},
 })

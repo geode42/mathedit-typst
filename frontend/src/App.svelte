@@ -10,6 +10,7 @@
   import { type JsSourceDiagnostic } from './lib/wasmUtils'
   import { addMathDelimiterIndentationListener, registerAutocomplete } from './lib/monaco-typst-init'
   import geode42Logo from './assets/geode42.svg'
+  import openInNewTab from './assets/open-in-new-tab.svg?raw'
 
   const defaultSource = [
     'Some math in Typst',
@@ -231,7 +232,7 @@
       <div class="spacer"></div>
       <span class='zoom-tip'>ctrl+scroll to zoom</span>
       <div class="line-spacer"></div>
-      <a class='math-reference-link' href="https://typst.app/docs/reference/math/" target="_blank" rel="noopener noreferrer">Math reference</a>
+      <a class='math-reference-link' href="https://typst.app/docs/reference/math/" target="_blank" rel="noopener noreferrer">Math reference{@html openInNewTab}</a>
     </div>
   </div>
   <div class="panes">
@@ -304,6 +305,12 @@
   }
   .math-reference-link {
     margin-left: 0.8rem;
+    margin-right: 0.1rem;
+    :global(svg) {
+      height: 0.95em;
+      vertical-align: middle;
+      margin-left: 0.4em;
+    }
   }
   .geode42-logo {
     height: 2.1rem;

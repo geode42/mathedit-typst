@@ -7,11 +7,11 @@ monaco.editor.defineTheme('mathedit', {
 	rules: [
 		{
 			token: 'variable',
-			foreground: '#7a18a8',
+			foreground: '#8121b6',
 		},
 		{
 			token: 'list-marker',
-			foreground: '#7a18a8',
+			foreground: '#8121b6',
 		},
 		{
 			token: 'function',
@@ -19,15 +19,19 @@ monaco.editor.defineTheme('mathedit', {
 		},
 		{
 			token: 'math.operator',
-			foreground: '#096a99',
+			foreground: '#2882ae',
 		},
 		{
 			token: 'newline',
-			foreground: '#096a99',
+			foreground: '#2882ae',
 		},
 		{
 			token: 'math.delimiter',
-			foreground: '#33a230',
+			foreground: '#1a9816',
+		},
+		{
+			token: 'string',
+			foreground: '#1a9816',
 		},
 		{
 			token: 'comment',
@@ -52,11 +56,23 @@ monaco.languages.setLanguageConfiguration('typst', {
 		blockComment: ['/*', '*/']
 	},
 	autoClosingPairs: [
-		{ open: '$', close: '$' }, // not in math would be nice, but the token provider below doesn't do that
-		{ open: '"', close: '"', notIn: ['string'] },
-		{ open: '*', close: '*', notIn: ['string'] }, // not in math would be nice for these too
-		{ open: '_', close: '_', notIn: ['string'] },
-		{ open: '`', close: '`', notIn: ['string'] },
+		// notIn doesn't seem to support a lot https://github.com/microsoft/monaco-editor/issues/2281
+		{ open: '$', close: '$' },
+		{ open: '"', close: '"' },
+		// you might not want to close these, especially when writing math or code
+		// { open: '*', close: '*' },
+		// { open: '_', close: '_' },
+		// { open: '`', close: '`' },
+		{ open: '(', close: ')' },
+		{ open: '{', close: '}' },
+		{ open: '[', close: ']' },
+	],
+	surroundingPairs: [
+		{ open: '$', close: '$' },
+		{ open: '"', close: '"' },
+		{ open: '*', close: '*' },
+		{ open: '_', close: '_' },
+		{ open: '`', close: '`' },
 		{ open: '(', close: ')' },
 		{ open: '{', close: '}' },
 		{ open: '[', close: ']' },
@@ -138,7 +154,7 @@ monaco.languages.setMonarchTokensProvider('typst', {
 	stringEscapes: /\\(?:[\\"nrt]|u\{[0-9A-Fa-f]{1,5}\})/,
 	mathEscapes: /\\(?:u\{[0-9A-Fa-f]{1,5}\}|.)/, // there are a bunch of math escapes (like $#^_&"\\, and stuff like "\!="), so i'm just matching everything
 	symbols: /[+\-*\/^_=!><|&]+/,
-	mathOperators: ['+', '-', '*', '/', '^', '_', '=', '!=', '>', '<', '>=', '<=', '|', '&', '&='],
+	mathOperators: ['+', '-', '*', '/', '^', '_', '=', '!=', '>', '<', '>=', '<=', '|', '&', '&=', '<-', '->'],
 	
 	tokenizer: {
 		root: [

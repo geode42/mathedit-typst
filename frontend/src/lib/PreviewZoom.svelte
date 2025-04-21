@@ -20,10 +20,9 @@
 </script>
 
 <div class="wrapper">
-	<button aria-label="+" class='increment-button' onclick={() => zoom(scale * zoomRate)}>
+	<button aria-label="-" class='decrement-button' onclick={() => zoom(scale / zoomRate)}>
 		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
 			<line x1="0" y1="5" x2="10" y2="5" stroke="black" />
-			<line x1="5" y1="0" x2="5" y2="10" stroke="black" />
 		</svg>
 	</button>
 	<div class="input-wrapper-wrapper"> <!-- i heard you like wrappers, so i wrapped your wrapper (this wrapper keeps the width constant and centers the wrapper underneath, which is there to overlay input + % sign) -->
@@ -39,9 +38,10 @@
 			<span class='input-units'>%</span>
 		</div>
 	</div>
-	<button aria-label="-" class='decrement-button' onclick={() => zoom(scale / zoomRate)}>
+	<button aria-label="+" class='increment-button' onclick={() => zoom(scale * zoomRate)}>
 		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
 			<line x1="0" y1="5" x2="10" y2="5" stroke="black" />
+			<line x1="5" y1="0" x2="5" y2="10" stroke="black" />
 		</svg>
 	</button>
 </div>

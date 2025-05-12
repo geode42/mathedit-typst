@@ -247,7 +247,7 @@
 <main>
   <div class="toolbar">
     <div class="toolbar-editor" style:width={`${editorPaneWidth}px`}>
-      <button onclick={() => appSpinAnimation.play()}>Spin</button>
+      <button class='spin-button' onclick={() => appSpinAnimation.play()}>Spin</button>
       <div class="spacer"></div>
       <a href="https://github.com/geode42/mathedit-typst" target="_blank" rel="noopener noreferrer">GitHub repo</a>
       <div class="spacer"></div>
@@ -415,5 +415,12 @@
   .svg-wrapper :global(.typst-doc) {
     box-shadow: 0 0 11px #00000015;
     border-radius: 0.5rem;
+  }
+
+  @media (prefers-reduced-motion) {
+    /* I think having the spacer still there looks better */
+    .spin-button {
+      display: none;
+    }
   }
 </style>

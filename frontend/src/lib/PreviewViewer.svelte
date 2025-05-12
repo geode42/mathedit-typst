@@ -1,9 +1,14 @@
 <script lang='ts'>
 	let { children, scale = $bindable(1), translation = $bindable([0, 0]) } = $props()
-	const zoomSpeed = 1.001
-	const scrollSpeed = 0.25
-	const scaleScrollPower = 0.5 // 0.5 feels like a nice middle ground between 0 and 1
 	
+	const zoomSpeed = 1.001
+	const gestureZoomSpeed = 1.01 // pinch-to-zoom on macOS, which emits wheel events with ctrl pressed and a very small deltaY
+	const scrollSpeed = 0.25
+	const gestureScrollSpeed = 0.9
+	const scaleScrollPower = 0.5 // 0.5 feels like a nice middle ground between 0 and 1
+	const gestureScaleScrollPower = 0 // consistent panning seems to feel better for gesture scrolling
+	const gestureMaxDelta = 100 // max amount deltaX/deltaY before a wheel event stops being considered a gesture, this could go even higher but I'm worried about reaching mouse territory
+		
 	const autoScrollInitialVelocityTimeFrame = 100 // mouse positions longer than this ms ago will be discarded
 	const momentumScrollMinStepDuration = 10 // mouse position entries will be merged until they're at least this ms long (to avoid duration rounding and div0 errors) (browsers only gives timestamps up to 1ms of accuracy)
 	const momentumScrollAcceleration = 0.9925 // when auto scrolling velocity is multiplied by this^delta each frame
@@ -80,12 +85,13 @@
 	class='container'
 	class:dragging={dragging}
 	onwheel={e => {
-		if (e.ctrlKey) {
+		const isGesture = Math.abs(e.deltaX) < gestureMaxDelta && Math.abs(e.deltaY) < gestureMaxDelta
+		if (e.ctrlKey || e.metaKey) {
 			const pointerPosBeforeTransform = [
 				((e.clientX - containerElement.offsetLeft) - translation[0]) / scale,
 				((e.clientY - containerElement.offsetTop) - translation[1]) / scale,
 			]
-			scale *= Math.pow(zoomSpeed, -e.deltaY)
+			scale *= Math.pow(isGesture ? gestureZoomSpeed : zoomSpeed, -e.deltaY)
 			const pointerPosAfterTransform = [
 				((e.clientX - containerElement.offsetLeft) - translation[0]) / scale,
 				((e.clientY - containerElement.offsetTop) - translation[1]) / scale,
@@ -94,8 +100,8 @@
 			translation[1] -= (pointerPosBeforeTransform[1] - pointerPosAfterTransform[1]) * scale
 			e.preventDefault()
 		} else {
-			translation[+e.shiftKey] -= e.deltaX * scrollSpeed * Math.pow(scale, scaleScrollPower)
-			translation[1-+e.shiftKey] -= e.deltaY * scrollSpeed * Math.pow(scale, scaleScrollPower)
+			translation[+e.shiftKey] -= e.deltaX * (isGesture ? gestureScrollSpeed : scrollSpeed) * Math.pow(scale, isGesture ? gestureScaleScrollPower : scaleScrollPower)
+			translation[1-+e.shiftKey] -= e.deltaY * (isGesture ? gestureScrollSpeed : scrollSpeed) * Math.pow(scale, isGesture ? gestureScaleScrollPower : scaleScrollPower)
 		}
 	}}
 	onpointerdown={e => {
@@ -115,7 +121,11 @@
 	}}
 	onpointermove={e => {
 		if (containerElement.hasPointerCapture(e.pointerId)) {
-			momentumScrollMousePositions.push(...(e.getCoalescedEvents().map(i => [i.timeStamp, i.clientX, i.clientY])))
+			if (e.getCoalescedEvents) {
+				momentumScrollMousePositions.push(...(e.getCoalescedEvents().map(i => [i.timeStamp, i.clientX, i.clientY])))
+			} else {
+				momentumScrollMousePositions.push([e.timeStamp, e.clientX, e.clientY])
+			}
 			while (momentumScrollMousePositions.length && (performance.now() - momentumScrollMousePositions[0][0]) > autoScrollInitialVelocityTimeFrame) {
 				momentumScrollMousePositions.shift()
 			}

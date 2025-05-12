@@ -58,6 +58,7 @@ input {
 
 body {
   margin: 0;
+  overscroll-behavior: none; /* fixes gestures in preview pane */
 }
 
 #app {

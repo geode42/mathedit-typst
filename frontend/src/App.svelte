@@ -7,7 +7,6 @@
   import { importBundledFonts } from './lib/typst-assets'
   import PreviewViewer from './lib/PreviewViewer.svelte'
   import PreviewZoom from './lib/PreviewZoom.svelte'
-  import { type JsSourceDiagnostic } from './lib/wasmUtils'
   import { addMathDelimiterIndentationListener, registerAutocomplete } from './lib/monaco-typst-init'
   import geode42Logo from './assets/geode42.svg'
   import openInNewTab from './assets/open-in-new-tab.svg?raw'
@@ -22,14 +21,14 @@
   const beforeUnloadHandler = (e: BeforeUnloadEvent) => e.preventDefault()
 
   let source = $state(defaultSource)
-  let previewSvg = $state('')
-  let previewSvgElement = $derived(new DOMParser().parseFromString(previewSvg ?? '<div></div>', 'text/html').body.childNodes[0])
+  let previewSvgPages: string[] = $state([])
   let previewScale = $state(1)
   let previewTranslation = $state([0, 0])
   let previewContainer: HTMLDivElement
   let svgWrapper: HTMLDivElement
   let logoVisible = $state(true)
-  
+  let centeredPageIndex: number | undefined = $state(undefined)
+
   let renderedOnce = -1 // -1 initially, 0 for the first fake update the effect below gets, 1 when it rendered the typst once
   let previewCenter = $state([0, 0])
 
@@ -43,8 +42,27 @@
       : removeEventListener('beforeunload', beforeUnloadHandler)
   })
 
+  function getCenteredPageIndex() {
+    if (previewSvgPages.length == 0) return undefined
+    const firstPageRect = (svgWrapper.firstElementChild as SVGElement).getBoundingClientRect()
+    const LastPageRect = (svgWrapper.lastElementChild as SVGElement).getBoundingClientRect()
+    if (previewCenter[1] < firstPageRect.top) return 0
+    if (previewCenter[1] > LastPageRect.bottom) return previewSvgPages.length - 1
+    return [...svgWrapper.children].findIndex(page => {
+      const rect = (page as SVGElement).getBoundingClientRect()
+      return rect.top <= previewCenter[1] && rect.bottom > previewCenter[1]
+    })
+  }
+
   $effect(() => {
-    svgWrapper.replaceChildren(previewSvgElement)
+    // react when these things change
+    previewSvgPages
+    previewTranslation[0], previewTranslation[1]
+    
+    centeredPageIndex = getCenteredPageIndex()
+  })
+
+  $effect(() => {
     setTimeout(() => {
       if (renderedOnce != 1) {
         renderedOnce++
@@ -58,7 +76,7 @@
   })
 
   let webWorldLoaded = false
-  const webWorld = wasm.WebWorld.new()
+  const webWorld = new wasm.WebWorld()
   ;(async () => {
     (await importBundledFonts()).forEach(f => webWorld.addFont(f))
     webWorldLoaded = true
@@ -69,17 +87,17 @@
     if (!webWorldLoaded) return
     webWorld.source = source
     webWorld.compile()
-    const svg = webWorld.renderSvg()
+    const svgPages = webWorld.toSvgPages()
 
-    if (svg) previewSvg = svg
+    if (svgPages) previewSvgPages = svgPages
 
-    const warnings: JsSourceDiagnostic[] = webWorld.warnings()
-    const errors: JsSourceDiagnostic[] = webWorld.errors()
+    const warnings = webWorld.warnings()
+    const errors = webWorld.errors()
 
     // in IMarkerData, `code` and `source` get added in light gray right after the message
     // src: https://code.visualstudio.com/api/references/vscode-api#Diagnostic
 
-    const getMarkerSpan = (diagnostic: JsSourceDiagnostic) => {
+    const getMarkerSpan = (diagnostic: wasm.SourceDiagnostic) => {
       const start = editor.getModel()!.getPositionAt(diagnostic.span.start)
       const end = editor.getModel()!.getPositionAt(diagnostic.span.end)
       return {
@@ -194,8 +212,21 @@
   })
 
   function zoomFit() {
-    previewScale = (previewContainer.offsetWidth - zoomFitPadding * 2) / svgWrapper.offsetWidth
+    if (centeredPageIndex == undefined) return
+
+    const centeredPage = [...svgWrapper.children][centeredPageIndex] as SVGElement
+    const centerYBeforeTransform = (previewCenter[1] - previewTranslation[1]) / previewScale
+    previewScale = (previewContainer.offsetWidth - zoomFitPadding * 2) / centeredPage.clientWidth
+    const centerYAfterTransform = (previewCenter[1] - previewTranslation[1]) / previewScale
+    
     previewTranslation[0] = zoomFitPadding
+    previewTranslation[1] -= (centerYBeforeTransform - centerYAfterTransform) * previewScale // keep center point the same
+
+    // ensure the view is below the top of the first page or above the bottom of the last page
+    const maxVerticalTranslation = zoomFitPadding
+    const minVerticalTranslation = Math.min(-(svgWrapper.offsetHeight * previewScale) - zoomFitPadding + previewContainer.offsetHeight, maxVerticalTranslation)
+    if (previewTranslation[1] > maxVerticalTranslation) previewTranslation[1] = maxVerticalTranslation
+    if (previewTranslation[1] < minVerticalTranslation) previewTranslation[1] = minVerticalTranslation
   }
   function translateTop() {
     previewTranslation[1] = zoomFitPadding
@@ -216,13 +247,13 @@
 <main>
   <div class="toolbar">
     <div class="toolbar-editor" style:width={`${editorPaneWidth}px`}>
-      <button onclick={() => appSpinAnimation.play()}>spin</button>
+      <button onclick={() => appSpinAnimation.play()}>Spin</button>
       <div class="spacer"></div>
       <a href="https://github.com/geode42/mathedit-typst" target="_blank" rel="noopener noreferrer">GitHub repo</a>
       <div class="spacer"></div>
       <button onclick={() => downloadData([source], 'text/vnd.typst', 'markup.typ')}>Download Source</button>
       <div class="spacer"></div>
-      <button onclick={() => downloadData([previewSvg], 'image/svg+xml', 'output.svg')}>Download SVG</button>
+      <button onclick={() => downloadData([previewSvgPages[centeredPageIndex!]], 'image/svg+xml', 'output.svg')}>Download SVG</button>
     </div>
     <div class="toolbar-preview">
       <div class="toolbar-zoom-container">
@@ -262,7 +293,11 @@
     </div>
     <div bind:this={previewContainer} class="preview-container">
       <PreviewViewer bind:scale={previewScale} bind:translation={previewTranslation}>
-        <div bind:this={svgWrapper} class="svg-wrapper"></div>
+        <div bind:this={svgWrapper} class="svg-wrapper">
+          {#each previewSvgPages as svg}
+          {@html svg}
+          {/each}
+        </div>
       </PreviewViewer>
     </div>
   </div>
@@ -371,7 +406,13 @@
 		overflow: hidden;
   }
 
-  .svg-wrapper :global(svg) {
+  .svg-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .svg-wrapper :global(.typst-doc) {
     box-shadow: 0 0 11px #00000015;
     border-radius: 0.5rem;
   }

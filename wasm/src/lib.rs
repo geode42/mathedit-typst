@@ -1,7 +1,15 @@
 use std::panic;
 
 use chrono::{DateTime, Datelike, Utc};
-use typst::{diag::{self, Warned}, foundations::{self, Datetime}, layout::PagedDocument, syntax::{self, FileId, VirtualPath}, text::{self, FontBook}, utils::LazyHash, Library, World};
+use typst::{
+    Library, World,
+    diag::{self, Warned},
+    foundations::{self, Datetime},
+    layout::PagedDocument,
+    syntax::{self, FileId, VirtualPath},
+    text::{self, FontBook},
+    utils::LazyHash,
+};
 use wasm_bindgen::prelude::*;
 
 mod web_structs;
@@ -18,7 +26,6 @@ extern "C" {
 pub struct WebWorld {
     pub source: String,
 
-    // boring stuff to implement world
     library: LazyHash<Library>,
     fonts: Vec<typst::text::Font>,
     book: LazyHash<FontBook>,
@@ -32,16 +39,15 @@ pub struct WebWorld {
 #[wasm_bindgen]
 impl WebWorld {
     /// Create a new web world with no fonts
+    #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
             source: String::new(),
-
             library: LazyHash::new(Library::default()),
             fonts: vec![],
             book: LazyHash::new(FontBook::new()),
             main: FileId::new(None, VirtualPath::new("/main.typ")),
             now: None,
-
             compilation_output: None,
             compilation_warnings: Vec::new(),
         }
@@ -61,45 +67,91 @@ impl WebWorld {
     /// Get errors from the previous compilation
     pub fn errors(&self) -> Vec<web_structs::SourceDiagnostic> {
         let empty_vec = Vec::new();
-        self.compilation_output.as_ref().map(|inner| inner.as_ref().err().unwrap_or(&empty_vec)).unwrap_or(&empty_vec).to_owned()
+        self.compilation_output
+            .as_ref()
+            .map(|inner| inner.as_ref().err().unwrap_or(&empty_vec))
+            .unwrap_or(&empty_vec)
+            .to_owned()
     }
 
     /// Get warnings from the previous compilation
     pub fn warnings(&self) -> Vec<web_structs::SourceDiagnostic> {
         self.compilation_warnings.clone()
     }
-    
-    /// Compile the document using the stored source code  
+
+    // compile, to_svg_pages, autocomplete, etc. are separate functions because
+    // you might want to get autocomplete without re-rendering the document,
+    // and this seemed like the simplest way of separating that logic
+
+    /// Update warnings, errors, output, and autocomplete  
+    /// Uses the stored source code
     pub fn compile(&mut self) {
         self.now = Some(Utc::now());
         let Warned { output, warnings } = typst::compile::<PagedDocument>(self);
-        self.compilation_output = Some(output.map_err(|v| v.iter().map(|e| web_structs::SourceDiagnostic::from_source_diagnostic_and_world(e, self)).collect()));
-        self.compilation_warnings = warnings.iter().map(|w| web_structs::SourceDiagnostic::from_source_diagnostic_and_world(w, self)).collect();
+        self.compilation_output = Some(output.map_err(|v| {
+            v.iter()
+                .map(|e| web_structs::SourceDiagnostic::from_source_diagnostic_and_world(e, self))
+                .collect()
+        }));
+        self.compilation_warnings = warnings
+            .iter()
+            .map(|w| web_structs::SourceDiagnostic::from_source_diagnostic_and_world(w, self))
+            .collect();
     }
-    
-    /// Return an SVG of the first page of the compiled document  
+
+    // typst_svg::svg_merged doesn't seem to work right(?)
+
+    /// Return svg's for all pages of the compiled document  
     /// Remember to run `compile()` before calling this!
-    #[wasm_bindgen(js_name = renderSvg)]
-    pub fn render_svg(&self) -> Option<String> {
-        if let Some(Ok(output)) = &self.compilation_output {
-            Some(typst_svg::svg(&output.pages[0]))
+    #[wasm_bindgen(js_name = toSvgPages)]
+    pub fn to_svg_pages(&self) -> Option<Vec<String>> {
+        if let Some(Ok(document)) = &self.compilation_output {
+            Some(
+                document
+                    .pages
+                    .iter()
+                    .map(|page| typst_svg::svg(page))
+                    .collect(),
+            )
         } else {
             None
         }
     }
 
-    pub fn autocomplete(&self, cursor: u32, explicit: bool) -> Option<web_structs_ide::Autocomplete> {
-        // lol
-        typst_ide::autocomplete(self, self.compilation_output.as_ref()?.as_ref().ok(), &self.source(FileId::new(None, VirtualPath::new("/main.typ"))).unwrap(), cursor as usize, explicit).and_then(|(position, completions)| Some((position, completions.iter().map(|c| web_structs_ide::Completion::from_typst_completion(c.clone())).collect()))).map(|i| web_structs_ide::Autocomplete::from_typst_completion(i))
+    /// Remember to run `compile()` before calling this!
+    pub fn autocomplete(
+        &self,
+        cursor: u32,
+        explicit: bool,
+    ) -> Option<web_structs_ide::Autocomplete> {
+        typst_ide::autocomplete(
+            self,
+            self.compilation_output.as_ref()?.as_ref().ok(),
+            &self
+                .source(FileId::new(None, VirtualPath::new("/main.typ")))
+                .unwrap(),
+            cursor as usize,
+            explicit,
+        )
+        .and_then(|(position, completions)| {
+            Some((
+                position,
+                completions
+                    .iter()
+                    .map(|c| web_structs_ide::Completion::from_typst_completion(c.clone()))
+                    .collect(),
+            ))
+        })
+        .map(|i| web_structs_ide::Autocomplete::from_typst_completion(i))
     }
 }
 
 impl typst::World for WebWorld {
-    fn library(&self) ->  &typst::utils::LazyHash<typst::Library> {
+    fn library(&self) -> &typst::utils::LazyHash<typst::Library> {
         &self.library
     }
 
-    fn book(&self) ->  &LazyHash<typst::text::FontBook> {
+    fn book(&self) -> &LazyHash<typst::text::FontBook> {
         &self.book
     }
 
@@ -107,26 +159,27 @@ impl typst::World for WebWorld {
         self.main
     }
 
-    fn source(&self, id:FileId) -> typst::diag::FileResult<typst::syntax::Source> {
+    fn source(&self, id: FileId) -> typst::diag::FileResult<typst::syntax::Source> {
         diag::FileResult::Ok(syntax::Source::new(id, self.source.clone()))
     }
 
-    fn file(&self, _id:FileId) -> diag::FileResult<typst::foundations::Bytes> {
+    fn file(&self, _id: FileId) -> diag::FileResult<typst::foundations::Bytes> {
         diag::FileResult::Ok(foundations::Bytes::from_string(self.source.clone()))
     }
 
-    fn font(&self, index:usize) -> Option<typst::text::Font> {
+    fn font(&self, index: usize) -> Option<typst::text::Font> {
         self.fonts.get(index).cloned()
     }
 
-    fn today(&self, offset:Option<i64>) -> Option<foundations::Datetime> {
-        // i think i largely copied this from typst's source code
-                
+    fn today(&self, offset: Option<i64>) -> Option<foundations::Datetime> {
+        // I think I largely copied this from typst's source code
+
         let with_offset = match offset {
             None => self.now?.with_timezone(&chrono::Local).fixed_offset(),
             Some(hours) => {
                 let seconds = i32::try_from(hours).ok()?.checked_mul(3600)?;
-                self.now?.with_timezone(&chrono::FixedOffset::east_opt(seconds)?)
+                self.now?
+                    .with_timezone(&chrono::FixedOffset::east_opt(seconds)?)
             }
         };
 

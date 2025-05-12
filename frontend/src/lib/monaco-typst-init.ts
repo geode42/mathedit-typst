@@ -1,4 +1,4 @@
-import type { CompletionType, WebWorld } from 'mathedit-typst-wasm'
+import type { CompletionVariant, WebWorld } from 'mathedit-typst-wasm'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 
 monaco.editor.defineTheme('mathedit', {
@@ -207,8 +207,8 @@ monaco.languages.setMonarchTokensProvider('typst', {
 	},
 })
 
-export function getMonacoCompletionItemKind(type: CompletionType): monaco.languages.CompletionItemKind {
-	const map: Record<CompletionType, monaco.languages.CompletionItemKind> = {
+export function getMonacoCompletionItemKind(type: CompletionVariant): monaco.languages.CompletionItemKind {
+	const map: Record<CompletionVariant, monaco.languages.CompletionItemKind> = {
 		'Syntax': monaco.languages.CompletionItemKind.Keyword, // i think?
 		'Func': monaco.languages.CompletionItemKind.Function,
 		'Type': monaco.languages.CompletionItemKind.TypeParameter, // TS uses Variable for its types though, so idk
@@ -251,7 +251,7 @@ export function registerAutocomplete(webWorld: WebWorld) {
 			return {
 				suggestions: completions.map(c => ({
 					label: c.label,
-					kind: getMonacoCompletionItemKind(c.kind.type),
+					kind: getMonacoCompletionItemKind(c.kind.variant),
 					detail: c.detail,
 					insertText: convertSnippet(c.apply || c.label),
 					insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,

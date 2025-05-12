@@ -13,20 +13,20 @@ impl Completion {
 	pub fn from_typst_completion(completion: typst_ide::Completion) -> Self {
 		Self {
 			kind: match completion.kind {
-				typst_ide::CompletionKind::Syntax => CompletionKind { kind: CompletionType::Syntax, data: None },
-				typst_ide::CompletionKind::Func => CompletionKind { kind: CompletionType::Func, data: None },
-				typst_ide::CompletionKind::Type => CompletionKind { kind: CompletionType::Type, data: None },
-				typst_ide::CompletionKind::Param => CompletionKind { kind: CompletionType::Param, data: None },
-				typst_ide::CompletionKind::Constant => CompletionKind { kind: CompletionType::Constant, data: None },
-				typst_ide::CompletionKind::Path => CompletionKind { kind: CompletionType::Path, data: None },
-				typst_ide::CompletionKind::Package => CompletionKind { kind: CompletionType::Package, data: None },
-				typst_ide::CompletionKind::Label => CompletionKind { kind: CompletionType::Label, data: None },
-				typst_ide::CompletionKind::Font => CompletionKind { kind: CompletionType::Font, data: None },
-				typst_ide::CompletionKind::Symbol(char) => CompletionKind { kind: CompletionType::Symbol, data: Some(char) },
+				typst_ide::CompletionKind::Syntax => CompletionKind { variant: CompletionVariant::Syntax, data: None },
+				typst_ide::CompletionKind::Func => CompletionKind { variant: CompletionVariant::Func, data: None },
+				typst_ide::CompletionKind::Type => CompletionKind { variant: CompletionVariant::Type, data: None },
+				typst_ide::CompletionKind::Param => CompletionKind { variant: CompletionVariant::Param, data: None },
+				typst_ide::CompletionKind::Constant => CompletionKind { variant: CompletionVariant::Constant, data: None },
+				typst_ide::CompletionKind::Path => CompletionKind { variant: CompletionVariant::Path, data: None },
+				typst_ide::CompletionKind::Package => CompletionKind { variant: CompletionVariant::Package, data: None },
+				typst_ide::CompletionKind::Label => CompletionKind { variant: CompletionVariant::Label, data: None },
+				typst_ide::CompletionKind::Font => CompletionKind { variant: CompletionVariant::Font, data: None },
+				typst_ide::CompletionKind::Symbol(char) => CompletionKind { variant: CompletionVariant::Symbol, data: Some(char) },
 			},
 			label: completion.label.to_string(),
-			apply: completion.apply.map(|i| i.to_string()),
-			detail: completion.detail.map(|i| i.to_string()),
+			apply: completion.apply.map(String::from),
+			detail: completion.detail.map(String::from),
 		}
 	}
 }
@@ -47,20 +47,17 @@ impl Autocomplete {
 	}
 }
 
-// having both a kind and a type feels confusing, look into that
-// (symbol completions have data, but JS doesn't have fancy enums so there are two types here to handle that instead)
-
+/// `data` is a character for the `Symbol` variant and empty otherwise
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Debug, Clone)]
 pub struct CompletionKind {
-	#[wasm_bindgen(js_name = "type")]
-	pub kind: CompletionType, // CompletionKind
+	pub variant: CompletionVariant,
 	pub data: Option<char>,
 }
 
 #[wasm_bindgen]
-#[derive(Debug, Clone, PartialEq)]
-pub enum CompletionType {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CompletionVariant {
 	Syntax = "Syntax",
 	Func = "Func",
 	Type = "Type",

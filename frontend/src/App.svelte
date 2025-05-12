@@ -10,13 +10,7 @@
   import { addMathDelimiterIndentationListener, registerAutocomplete } from './lib/monaco-typst-init'
   import geode42Logo from './assets/geode42.svg'
   import openInNewTab from './assets/open-in-new-tab.svg?raw'
-
-  const defaultSource = [
-    'Some math in Typst',
-    '',
-    '$(m v^2) / r = q v times B$',
-    ''
-  ].join('\n')
+  import defaultSource from './lib/defaultSource.typ?raw'
 
   const beforeUnloadHandler = (e: BeforeUnloadEvent) => e.preventDefault()
 
@@ -29,7 +23,7 @@
   let logoVisible = $state(true)
   let centeredPageIndex: number | undefined = $state(undefined)
 
-  let renderedOnce = -1 // -1 initially, 0 for the first fake update the effect below gets, 1 when it rendered the typst once
+  let renderedOnce = false
   let previewCenter = $state([0, 0])
 
   function updatePreviewCenter() {
@@ -62,18 +56,13 @@
     centeredPageIndex = getCenteredPageIndex()
   })
 
-  $effect(() => {
+  function afterFirstRender() {
     setTimeout(() => {
-      if (renderedOnce != 1) {
-        renderedOnce++
-        if (renderedOnce == 1) {
-          zoomFit()
-          translateTop()
-          updatePreviewCenter()
-        }
-      }
+      zoomFit()
+      translateTop()
+      updatePreviewCenter()
     })
-  })
+  }
 
   let webWorldLoaded = false
   const webWorld = new wasm.WebWorld()
@@ -93,6 +82,11 @@
 
     const warnings = webWorld.warnings()
     const errors = webWorld.errors()
+
+    if (!renderedOnce) {
+      renderedOnce = true
+      afterFirstRender()
+    }
 
     // in IMarkerData, `code` and `source` get added in light gray right after the message
     // src: https://code.visualstudio.com/api/references/vscode-api#Diagnostic
